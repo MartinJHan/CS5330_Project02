@@ -1,0 +1,21 @@
+# Build directories
+cmake-build-*/
+build/
+
+# Compiled binaries
+bin/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Temporary files
+*.o
+*.out
+
+# Dataset (large)
+data/olympus/*
+!data/olympus/.gitkeep
