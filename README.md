@@ -17,6 +17,9 @@ Implemented tasks:
 - Task 2: Whole-image 2D color histogram matching (rg chromaticity + intersection)
 - Task 3: Multi-histogram matching (top/bottom RGB histograms + equal weighting)
 - Task 4: Color + texture matching (color histogram + Sobel magnitude histogram)
+- Task 5: Deep network embeddings (ResNet18 features + cosine distance)
+- Task 6: Comparative analysis of DNN vs. classical features
+- Task 7: Custom design (banana object detector with optimized hybrid features)
 
 ------------------------------------------------------------
 
@@ -29,11 +32,24 @@ Implemented tasks:
     │   └── csv_util.h
     ├── src/
     │   ├── cbir_baseline.cpp
+    │   ├── cbir_custom.cpp
+    │   ├── cbir_dnn.cpp
     │   ├── csv_util.cpp
+    │   └── feature.cpp
     │   └── readfiles.cpp
     ├── data/
-    │   └── olympus/    (image dataset, not tracked in git)
+    │   └── olympus/        (image dataset, not tracked in git)
+    │   └── training_set/    (small image dataset for custom design, not tracked in git)
     └── README.md
+
+------------------------------------------------------------
+
+## System Requirements
+
+C++ Compiler: C++17 or later (g++, clang++)
+CMake: Version 3.15 or higher
+OpenCV: Version 4.x
+Operating System: macOS, Linux, or Windows
 
 ------------------------------------------------------------
 
@@ -131,6 +147,57 @@ Run (required query example):
 
 ------------------------------------------------------------
 
+## Task 5: Deep Network Embeddings
+
+Feature:
+- Precomputed 512-dimensional ResNet18 feature vectors (trained on ImageNet)
+- Feature vectors are loaded from a CSV file rather than computed at runtime
+
+Distance:
+- Cosine distance between feature vectors
+
+Run:
+    ./cbir_dnn <target_image> <image_dir> <topN> <embedding_csv>
+
+Example:
+    ./cbir_dnn data/olympus/pic.0164.jpg data/olympus 5 data/ResNet18_olym.csv
+
+Expected behavior:
+- The target image should appear as the top match with distance 0
+- Retrieved images reflect semantic similarity (object category or scene type)
+
+------------------------------------------------------------
+## Task 6 – Compare DNN Embeddings and Classic Features 
+
+No separate executable. Use existing programs to compare methods on test images.
+
+Run (for pic.1072):
+    ./cbir_baseline ../data/olympus/pic.1072.jpg ../data/olympus 5 hist2d
+    ./cbir_baseline ../data/olympus/pic.1072.jpg ../data/olympus 5 colortexture
+    ./cbir_dnn pic.1072.jpg ../data/ResNet18_olym.csv 5 cosine
+
+Repeat for pic.0948 and pic.0734 to compare results.
+
+------------------------------------------------------------
+
+## Task 7 – Custom Design (Banana Object Detector)
+
+Usage:
+    ./cbir_custom <target_image> <image_dir> <dnn_csv> <topN>
+
+Run (required queries):
+    ./cbir_custom ../data/olympus/pic.0343.jpg ../data/olympus ../data/ResNet18_olym.csv 10
+    ./cbir_custom ../data/olympus/pic.0345.jpg ../data/olympus ../data/ResNet18_olym.csv 10
+    ./cbir_custom ../data/olympus/pic.0344.jpg ../data/olympus ../data/ResNet18_olym.csv 10
+
+------------------------------------------------------------
+
+## Extensions
+
+No extensions were implemented for this submission.
+
+------------------------------------------------------------
+
 ## Notes
 
 - The dataset directory (data/olympus) is not included in this repository due to size.
@@ -143,3 +210,11 @@ Run (required query example):
 
 Starter code and project description provided by the course instructor.
 OpenCV library is used for image processing utilities.
+
+------------------------------------------------------------
+
+## Time Travel Days
+
+No time travel days used for this submission.
+
+------------------------------------------------------------
