@@ -29,7 +29,6 @@ target_link_libraries(cbir_dnn ${OpenCV_LIBS})
 # Executable for Task 7: Custom Design (Banana Detector)
 add_executable(cbir_custom
         src/cbir_custom.cpp
-        src/cbir_baseline.cpp
 )
 
 target_link_libraries(cbir_custom ${OpenCV_LIBS})

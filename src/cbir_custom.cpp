@@ -3,10 +3,6 @@
  * Date: 2026-02-08
  * Purpose:
  *   Project 2 Task 7: Custom CBIR design for yellow object detection
- *   Combines yellow color detection with texture (Sobel) and DNN features
- *
- * Usage:
- *   ./cbir_custom <target_image> <image_dir> <dnn_csv> <topN>
  */
 
 #include <cstdio>
@@ -21,12 +17,11 @@
 #include <string>
 #include <algorithm>
 
-#include "feature.h" 
+// 移除 #include "feature.h"
 
 /**
  * Summary:
- *   Computes the ratio of yellow pixels in an image.
- *   Uses HSV color space: Hue 20-30, Saturation > 100, Value > 100
+ *   Computes the ratio of yellow pixels.
  */
 float computeYellowRatio(const cv::Mat &img) {
     if (img.empty() || img.channels() != 3) return 0.0f;
@@ -55,22 +50,32 @@ float computeYellowRatio(const cv::Mat &img) {
 
 /**
  * Summary:
- *   Computes texture distance using histogram intersection.
- *   Reuses sobelMagHist1D and histIntersection from feature.h
+ *   Computes average Sobel gradient magnitude as texture feature.
  */
-double computeTextureDistance(const cv::Mat &img1, const cv::Mat &img2, int bins) {
-    std::vector<float> hist1, hist2;
+float computeTextureMagnitude(const cv::Mat &img) {
+    if (img.empty()) return 0.0f;
     
-    if (sobelMagHist1D(img1, bins, hist1) != 0) return 1.0;
-    if (sobelMagHist1D(img2, bins, hist2) != 0) return 1.0;
+    cv::Mat gray;
+    if (img.channels() == 3) {
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        gray = img;
+    }
     
-    double intersection = histIntersection(hist1, hist2);
-    return 1.0 - intersection;  // Convert similarity to distance
+    cv::Mat gx, gy;
+    cv::Sobel(gray, gx, CV_32F, 1, 0, 3);
+    cv::Sobel(gray, gy, CV_32F, 0, 1, 3);
+    
+    cv::Mat magnitude;
+    cv::magnitude(gx, gy, magnitude);
+    
+    cv::Scalar meanMag = cv::mean(magnitude);
+    return (float)meanMag[0];
 }
 
 /**
  * Summary:
- *   Reads DNN features from CSV file.
+ *   Reads DNN features from CSV.
  */
 int readDNNFeatures(const char *csvPath,
                     std::vector<std::string> &filenames,
@@ -111,7 +116,7 @@ int readDNNFeatures(const char *csvPath,
 
 /**
  * Summary:
- *   Computes cosine distance between two feature vectors.
+ *   Computes cosine distance.
  */
 double computeCosineDistance(const std::vector<float> &a, 
                              const std::vector<float> &b) {
@@ -139,26 +144,7 @@ double computeCosineDistance(const std::vector<float> &a,
 
 /**
  * Summary:
- *   Computes custom distance for yellow object detection.
- *   Balanced weights: color + texture + DNN
- *   
- *   Distance = 0.3 × |ΔYellow| + 0.3 × TextureDist + 0.4 × DNN_distance
- *
- * Weight rationale:
- *   - Yellow color (30%): Identifies yellow objects
- *   - Texture (30%): Distinguishes smooth banana surface from other objects
- *   - DNN (40%): Provides semantic context
- */
-double computeCustomDistance(float yellowT, double textureDist, double dnnDist) {
-    double yellowDist = (double)yellowT;
-    
-    // Balanced weights: color + texture = 60%, DNN = 40%
-    return 0.3 * yellowDist + 0.3 * textureDist + 0.4 * dnnDist;
-}
-
-/**
- * Summary:
- *   Checks if filename is an image file.
+ *   Checks if filename is an image.
  */
 static bool isImageName(const char *name) {
     return (strstr(name, ".jpg") || strstr(name, ".JPG") ||
@@ -168,14 +154,12 @@ static bool isImageName(const char *name) {
 
 /**
  * Summary:
- *   Main entry point for custom banana detector.
+ *   Main entry point.
  */
 int main(int argc, char *argv[]) {
     if (argc < 5) {
         std::cout << "Usage: " << argv[0] 
                   << " <target_image> <image_dir> <dnn_csv> <topN>\n";
-        std::cout << "Example: ./cbir_custom pic.0343.jpg ./data/olympus "
-                  << "./data/ResNet18_olym.csv 10\n";
         return -1;
     }
     
@@ -183,8 +167,6 @@ int main(int argc, char *argv[]) {
     const char *imageDir = argv[2];
     const char *csvPath = argv[3];
     int topN = atoi(argv[4]);
-    
-    const int textureBins = 16;  // Number of bins for Sobel histogram
     
     if (topN <= 0) {
         std::cerr << "Error: topN must be positive\n";
@@ -194,14 +176,16 @@ int main(int argc, char *argv[]) {
     // Read target image
     cv::Mat targetImg = cv::imread(targetPath, cv::IMREAD_COLOR);
     if (targetImg.empty()) {
-        std::cerr << "Error: Cannot read target image " << targetPath << "\n";
+        std::cerr << "Error: Cannot read target image\n";
         return -1;
     }
     
     // Compute target features
     float targetYellow = computeYellowRatio(targetImg);
+    float targetTexture = computeTextureMagnitude(targetImg);
     
     std::cout << "Target yellow ratio: " << targetYellow << "\n";
+    std::cout << "Target texture magnitude: " << targetTexture << "\n";
     
     // Load DNN features
     std::vector<std::string> dnnFilenames;
@@ -218,8 +202,6 @@ int main(int argc, char *argv[]) {
         targetFilename = targetFilename.substr(lastSlash + 1);
     }
     
-    std::cout << "Looking for target filename: " << targetFilename << "\n";
-    
     // Find target in DNN database
     int targetDNNIdx = -1;
     for (size_t i = 0; i < dnnFilenames.size(); i++) {
@@ -230,22 +212,20 @@ int main(int argc, char *argv[]) {
     }
     
     if (targetDNNIdx == -1) {
-        std::cerr << "Warning: Target not found in DNN database\n";
+        std::cerr << "Error: Target not found in DNN database\n";
         return -1;
     }
     
-    // Scan directory and compute distances
+    // Scan directory
     DIR *dirp = opendir(imageDir);
     if (!dirp) {
-        std::cerr << "Error: Cannot open directory " << imageDir << "\n";
+        std::cerr << "Error: Cannot open directory\n";
         return -1;
     }
     
     std::vector<std::pair<std::string, double>> results;
     struct dirent *dp;
     char imgPath[1024];
-    
-    int processedCount = 0;
     
     while ((dp = readdir(dirp)) != NULL) {
         if (dp->d_name[0] == '.' || !isImageName(dp->d_name)) continue;
@@ -257,14 +237,16 @@ int main(int argc, char *argv[]) {
         cv::Mat img = cv::imread(imgPath, cv::IMREAD_COLOR);
         if (img.empty()) continue;
         
-        // 1. Compute yellow ratio
+        // Compute features
         float imgYellow = computeYellowRatio(img);
+        float imgTexture = computeTextureMagnitude(img);
+        
+        // Compute distances
         double yellowDist = fabs(targetYellow - imgYellow);
+        double textureDist = fabs(targetTexture - imgTexture) / 50.0;
+        if (textureDist > 1.0) textureDist = 1.0;
         
-        // 2. Compute texture distance (using existing Sobel function)
-        double textureDist = computeTextureDistance(targetImg, img, textureBins);
-        
-        // 3. Find DNN feature and compute distance
+        // Find DNN distance
         double dnnDist = 1.0;
         for (size_t i = 0; i < dnnFilenames.size(); i++) {
             if (dnnFilenames[i] == std::string(dp->d_name)) {
@@ -276,18 +258,15 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // 4. Compute combined distance
-        double combinedDist = 0.3 * yellowDist + 0.3 * textureDist + 0.4 * dnnDist;
+        // Combined distance: 0.45 yellow + 0.1 texture + 0.45 DNN
+        double combinedDist = 0.45 * yellowDist + 0.1 * textureDist + 0.45 * dnnDist;
         
         results.emplace_back(imgPath, combinedDist);
-        processedCount++;
     }
     
     closedir(dirp);
     
-    std::cout << "Processed " << processedCount << " images\n";
-    
-    // Sort and display results
+    // Sort and display
     std::sort(results.begin(), results.end(),
               [](const auto &a, const auto &b) {
                   return a.second < b.second;
@@ -300,8 +279,8 @@ int main(int argc, char *argv[]) {
                   << "  (distance: " << results[i].second << ")\n";
     }
     
-    // Print bottom 5
-    std::cout << "\nBottom 5 matches (least similar):\n";
+    // Bottom 5
+    std::cout << "\nBottom 5 matches:\n";
     if (results.size() >= 5) {
         for (size_t i = results.size() - 5; i < results.size(); i++) {
             std::cout << (i - (results.size() - 5) + 1) << ": " 
