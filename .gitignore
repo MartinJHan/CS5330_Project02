@@ -18,4 +18,5 @@ bin/
 
 # Dataset (large)
 data/olympus/*
+data/training_set/
 !data/olympus/.gitkeep
